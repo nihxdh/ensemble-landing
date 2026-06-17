@@ -11,9 +11,11 @@ export const lerp = (a, b, t) => a + (b - a) * t
 
 export const SMOOTH = {
   scroll: 2.4,
-  section: 2.4,
-  pan: 2.4,
-  align: 2.2,
+  scrollSection2: 7,
+  section: 7,
+  pan: 8.5,
+  align: 7,
+  s2Exit: 6,
   section3: 2.2,
   section4: 2.2,
   section5: 2.2,

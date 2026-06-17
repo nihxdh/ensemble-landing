@@ -651,26 +651,12 @@ body {
     scrollbar-color: rgba(138, 92, 255, 0.28) transparent;
   }
 
-  .s3-accordion-scroll::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .s3-accordion-scroll::-webkit-scrollbar-thumb {
-    border-radius: 9999px;
-    background: rgba(138, 92, 255, 0.28);
-  }
-
-  .veil-stat {
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 900;
-    font-style: italic;
-    color: rgba(200, 170, 230, 0.9);
-  }
-
   .section-scroll-content {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: rgba(138, 92, 255, 0.28) transparent;
+    scroll-padding-top: 1.5rem;
+    overscroll-behavior-y: auto;
   }
 
   .section-scroll-content::-webkit-scrollbar {

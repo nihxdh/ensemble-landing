@@ -18,50 +18,54 @@ import {
   lerp,
 } from '../utils/motion'
 
-const HERO_FADE_START = 0.03
-const HERO_FADE_END = 0.14
-const BRIGHTEN_END = 0.22
-const BG_FADE_START = 0.24
-const SECTION2_START = 0.26
-const SECTION2A_END = 0.40
+// Total scroll track height — lower = less wheel travel, same progress timing
+const SCROLL_PAGE_HEIGHT_VH = 800
 
-const SECTION2B_START = 0.42
-const SECTION2B_END = 0.56
+// Section 1 (hero → brighten → handoff): shorter pre-transition scroll, same fade/brighten spans
+const HERO_FADE_START = 0.005
+const HERO_FADE_END = 0.04
+const BRIGHTEN_END = 0.085
+const BG_FADE_START = 0.095
+const SECTION2_START = 0.105
+const SECTION2A_END = 0.245
 
-const S2_EXIT_BRIGHTEN_START = 0.56
-const S2_EXIT_BRIGHTEN_END = 0.66
-const S2_EXIT_FADE_START = 0.64
-const S2_EXIT_FADE_END = 0.72
+const SECTION2B_START = 0.265
+const SECTION2B_END = 0.365
 
-const SECTION3_START = 0.66
-const SECTION3_END = 0.78
+const S2_EXIT_BRIGHTEN_START = 0.365
+const S2_EXIT_BRIGHTEN_END = 0.445
+const S2_EXIT_FADE_START = 0.425
+const S2_EXIT_FADE_END = 0.485
 
-const S3_EXIT_BRIGHTEN_START = 0.78
-const S3_EXIT_BRIGHTEN_END = 0.90
-const S3_EXIT_FADE_START = 0.86
-const S3_EXIT_FADE_END = 0.95
+const SECTION3_START = 0.445
+const SECTION3_END = 0.535
 
-const S3_BRIDGE_START = 0.79
-const S3_BRIDGE_PEAK = 0.875
-const S3_BRIDGE_END = 0.93
+const S3_EXIT_BRIGHTEN_START = 0.535
+const S3_EXIT_BRIGHTEN_END = 0.595
+const S3_EXIT_FADE_START = 0.575
+const S3_EXIT_FADE_END = 0.615
 
-const SECTION4_START = 0.88
-const SECTION4_END = 0.94
+const S3_BRIDGE_START = 0.545
+const S3_BRIDGE_PEAK = 0.575
+const S3_BRIDGE_END = 0.605
 
-const S4_EXIT_BRIGHTEN_START = 0.94
-const S4_EXIT_BRIGHTEN_END = 0.965
-const S4_EXIT_FADE_START = 0.952
-const S4_EXIT_FADE_END = 0.975
+const SECTION4_START = 0.59
+const SECTION4_END = 0.68
 
-const SECTION5_START = 0.928
-const SECTION5_END = 0.962
+const S4_EXIT_BRIGHTEN_START = 0.68
+const S4_EXIT_BRIGHTEN_END = 0.73
+const S4_EXIT_FADE_START = 0.71
+const S4_EXIT_FADE_END = 0.75
 
-const S5_EXIT_BRIGHTEN_START = 0.962
-const S5_EXIT_BRIGHTEN_END = 0.982
-const S5_EXIT_FADE_START = 0.968
-const S5_EXIT_FADE_END = 0.992
+const SECTION5_START = 0.695
+const SECTION5_END = 0.77
 
-const SECTION6_START = 0.975
+const S5_EXIT_BRIGHTEN_START = 0.77
+const S5_EXIT_BRIGHTEN_END = 0.80
+const S5_EXIT_FADE_START = 0.785
+const S5_EXIT_FADE_END = 0.82
+
+const SECTION6_START = 0.785
 const SECTION6_END = 1.0
 
 const PART_A_SPLIT_PCT = 48
@@ -347,6 +351,38 @@ const Landing = () => {
   const lastFrame = useRef(0)
   const countAnimA = useRef({ active: false, start: 0, progress: 0 })
   const countAnimB = useRef({ active: false, start: 0, progress: 0 })
+  const s3ScrollPrimedRef = useRef(false)
+  const s4ScrollPrimedRef = useRef(false)
+  const s5ScrollPrimedRef = useRef(false)
+
+  useEffect(() => {
+    const bindScrollPassthrough = (ref) => {
+      const el = ref.current
+      if (!el) return () => {}
+
+      const onWheel = (e) => {
+        if (el.scrollHeight <= el.clientHeight + 2) return
+
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2
+        const atTop = el.scrollTop <= 0
+
+        if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
+          window.scrollBy(0, e.deltaY)
+        }
+      }
+
+      el.addEventListener('wheel', onWheel, { passive: true })
+      return () => el.removeEventListener('wheel', onWheel)
+    }
+
+    const cleanups = [
+      bindScrollPassthrough(s3ContentRef),
+      bindScrollPassthrough(s4ContentRef),
+      bindScrollPassthrough(s5ContentRef),
+    ]
+
+    return () => cleanups.forEach((cleanup) => cleanup())
+  }, [])
 
   useEffect(() => {
     let rafId = null
@@ -365,7 +401,11 @@ const Landing = () => {
       const dt = Math.min((now - (lastFrame.current || now)) / 1000, 0.05)
       lastFrame.current = now
 
-      smoothProgress.current = damp(smoothProgress.current, targetProgress.current, SMOOTH.scroll, dt)
+      const inSection2 =
+        targetProgress.current >= SECTION2_START
+        && targetProgress.current <= S2_EXIT_FADE_END
+      const scrollLambda = inSection2 ? SMOOTH.scrollSection2 : SMOOTH.scroll
+      smoothProgress.current = damp(smoothProgress.current, targetProgress.current, scrollLambda, dt)
       const p = smoothProgress.current
 
       const brightenTarget = Math.min(p / BRIGHTEN_END, 1)
@@ -449,8 +489,8 @@ const Landing = () => {
       brightenSmooth.current = damp(brightenSmooth.current, brightenTarget, SMOOTH.phase, dt)
       lightPassSmooth.current = damp(lightPassSmooth.current, lightPassTarget, SMOOTH.phase, dt)
       heroFadeSmooth.current = damp(heroFadeSmooth.current, heroFadeTarget, SMOOTH.phase, dt)
-      s2ExitBrightenSmooth.current = damp(s2ExitBrightenSmooth.current, s2ExitBrightenTarget, SMOOTH.exit, dt)
-      s2ExitFadeSmooth.current = damp(s2ExitFadeSmooth.current, s2ExitFadeTarget, SMOOTH.exit, dt)
+      s2ExitBrightenSmooth.current = damp(s2ExitBrightenSmooth.current, s2ExitBrightenTarget, SMOOTH.s2Exit, dt)
+      s2ExitFadeSmooth.current = damp(s2ExitFadeSmooth.current, s2ExitFadeTarget, SMOOTH.s2Exit, dt)
       s3ExitBrightenSmooth.current = damp(s3ExitBrightenSmooth.current, s3ExitBrightenTarget, SMOOTH.exit, dt)
       s3ExitFadeSmooth.current = damp(s3ExitFadeSmooth.current, s3ExitFadeTarget, SMOOTH.exit, dt)
       s4ExitBrightenSmooth.current = damp(s4ExitBrightenSmooth.current, s4ExitBrightenTarget, SMOOTH.exit, dt)
@@ -459,7 +499,7 @@ const Landing = () => {
       s5ExitFadeSmooth.current = damp(s5ExitFadeSmooth.current, s5ExitFadeTarget, SMOOTH.exit, dt)
       section2Smooth.current = damp(section2Smooth.current, s2aTarget, SMOOTH.section, dt)
       panSmooth.current = damp(panSmooth.current, s2bTarget, SMOOTH.pan, dt)
-      alignSmooth.current = damp(alignSmooth.current, 1 - panSmooth.current, SMOOTH.align, dt)
+      alignSmooth.current = damp(alignSmooth.current, 1 - s2bTarget, SMOOTH.align, dt)
       section3Smooth.current = damp(section3Smooth.current, s3Target, SMOOTH.section3, dt)
       section4Smooth.current = damp(section4Smooth.current, s4Target, SMOOTH.section4, dt)
       section5Smooth.current = damp(section5Smooth.current, s5Target, SMOOTH.section5, dt)
@@ -674,11 +714,21 @@ const Landing = () => {
           : 'none'
       }
       if (s5ContentRef.current) {
-        s5ContentRef.current.style.opacity = String(s5ContentOpacity)
-        s5ContentRef.current.style.filter = s5ExitBrighten > 0.01
+        const s5ScrollEl = s5ContentRef.current
+
+        if (s5Opacity > 0.12 && !s5ScrollPrimedRef.current) {
+          s5ScrollEl.scrollTop = 0
+          s5ScrollPrimedRef.current = true
+        }
+        if (s5Opacity < 0.05) {
+          s5ScrollPrimedRef.current = false
+        }
+
+        s5ScrollEl.style.opacity = String(s5ContentOpacity)
+        s5ScrollEl.style.filter = s5ExitBrighten > 0.01
           ? `blur(${s5ExitBrighten * 10}px)`
           : 'none'
-        s5ContentRef.current.style.transform = s5ExitBrighten > 0.01
+        s5ScrollEl.style.transform = s5ExitBrighten > 0.01
           ? `translateY(${s5ExitBrighten * -16}px) scale(${1 - s5ExitBrighten * 0.03})`
           : 'none'
       }
@@ -692,11 +742,21 @@ const Landing = () => {
           : 'none'
       }
       if (s4ContentRef.current) {
-        s4ContentRef.current.style.opacity = String(s4ContentOpacity)
-        s4ContentRef.current.style.filter = s4ExitBrighten > 0.01
+        const s4ScrollEl = s4ContentRef.current
+
+        if (s4Opacity > 0.12 && !s4ScrollPrimedRef.current) {
+          s4ScrollEl.scrollTop = 0
+          s4ScrollPrimedRef.current = true
+        }
+        if (s4Opacity < 0.05) {
+          s4ScrollPrimedRef.current = false
+        }
+
+        s4ScrollEl.style.opacity = String(s4ContentOpacity)
+        s4ScrollEl.style.filter = s4ExitBrighten > 0.01
           ? `blur(${s4ExitBrighten * 10}px)`
           : 'none'
-        s4ContentRef.current.style.transform = s4ExitBrighten > 0.01
+        s4ScrollEl.style.transform = s4ExitBrighten > 0.01
           ? `translateY(${s4ExitBrighten * -16}px) scale(${1 - s4ExitBrighten * 0.03})`
           : 'none'
       }
@@ -713,11 +773,21 @@ const Landing = () => {
           : 'none'
       }
       if (s3ContentRef.current) {
-        s3ContentRef.current.style.opacity = String(s3ContentOpacity)
-        s3ContentRef.current.style.filter = s3ExitBrighten > 0.01
+        const s3ScrollEl = s3ContentRef.current
+
+        if (s3Opacity > 0.12 && !s3ScrollPrimedRef.current) {
+          s3ScrollEl.scrollTop = 0
+          s3ScrollPrimedRef.current = true
+        }
+        if (s3Opacity < 0.05) {
+          s3ScrollPrimedRef.current = false
+        }
+
+        s3ScrollEl.style.opacity = String(s3ContentOpacity)
+        s3ScrollEl.style.filter = s3ExitBrighten > 0.01
           ? `blur(${s3ExitBrighten * 10}px)`
           : 'none'
-        s3ContentRef.current.style.transform = s3ExitBrighten > 0.01
+        s3ScrollEl.style.transform = s3ExitBrighten > 0.01
           ? `translateY(${s3ExitBrighten * -16}px) scale(${1 - s3ExitBrighten * 0.03})`
           : 'none'
       }
@@ -987,7 +1057,11 @@ const Landing = () => {
 
   return (
     <div className="bg-[#120F17]">
-      <div ref={transitionRef} className="relative h-[1500vh]">
+      <div
+        ref={transitionRef}
+        className="relative"
+        style={{ height: `${SCROLL_PAGE_HEIGHT_VH}vh` }}
+      >
         <div className="sticky top-0 h-screen w-full overflow-hidden bg-[#120F17]">
           <div ref={bgRef} className="absolute inset-0 will-change-[opacity]">
             <ColorBends
@@ -1201,9 +1275,9 @@ const Landing = () => {
 
             <div
               ref={s3ContentRef}
-              className="relative z-10 flex h-full w-full flex-col items-center overflow-y-auto px-3 py-8 will-change-[opacity,transform,filter] md:px-4 md:py-10 lg:px-5"
+              className="section-scroll-content relative z-10 flex h-full min-h-0 w-full flex-col items-center justify-start overflow-y-auto px-3 pt-6 pb-8 will-change-[opacity,transform,filter] sm:px-4 md:px-4 md:py-10 lg:px-5"
             >
-              <div className="w-full max-w-6xl text-center">
+              <div className="w-full max-w-6xl shrink-0 text-center">
                 <p
                   ref={s3LabelRef}
                   className="veil-eyebrow mb-4 text-[9px] font-semibold uppercase will-change-[opacity,transform,filter] md:text-[10px]"
@@ -1315,9 +1389,9 @@ const Landing = () => {
 
             <div
               ref={s4ContentRef}
-              className="section-scroll-content relative z-10 flex h-full w-full flex-col items-center justify-start overflow-y-auto overscroll-contain px-5 py-8 will-change-[opacity,transform,filter] sm:px-6 md:px-10 md:py-10 lg:justify-center lg:px-14"
+              className="section-scroll-content relative z-10 flex h-full min-h-0 w-full flex-col items-center justify-start overflow-y-auto px-5 pt-6 pb-8 will-change-[opacity,transform,filter] sm:px-6 md:px-10 md:py-10 lg:px-14"
             >
-              <div className="w-full max-w-6xl text-center">
+              <div className="w-full max-w-6xl shrink-0 text-center">
                 <p
                   ref={s4LabelRef}
                   className="neon-hero-sub mb-4 text-[9px] tracking-[0.22em] will-change-[opacity,transform,filter] sm:mb-5 sm:text-[10px] sm:tracking-[0.35em] md:text-xs"
@@ -1442,9 +1516,9 @@ const Landing = () => {
 
             <div
               ref={s5ContentRef}
-              className="section-scroll-content relative z-10 flex h-full w-full flex-col items-center justify-start overflow-y-auto overscroll-contain px-5 py-8 will-change-[opacity,transform,filter] sm:px-6 md:px-10 md:py-10 lg:justify-center lg:px-14"
+              className="section-scroll-content relative z-10 flex h-full min-h-0 w-full flex-col items-center justify-start overflow-y-auto px-5 pt-6 pb-8 will-change-[opacity,transform,filter] sm:px-6 md:px-10 md:py-10 lg:px-14"
             >
-              <div className="w-full max-w-6xl text-center">
+              <div className="w-full max-w-6xl shrink-0 text-center">
                 <p
                   ref={s5LabelRef}
                   className="neon-hero-sub mb-4 text-[9px] tracking-[0.22em] will-change-[opacity,transform,filter] sm:mb-5 sm:text-[10px] sm:tracking-[0.35em] md:text-xs"
